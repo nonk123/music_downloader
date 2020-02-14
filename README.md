@@ -1,1 +1,1 @@
-# yandex_music_downloader
+# music_downloader
