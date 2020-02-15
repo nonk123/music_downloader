@@ -4,4 +4,7 @@
 *.pyc
 __pycache__
 
+Music/
+Cache/
+
 config.py

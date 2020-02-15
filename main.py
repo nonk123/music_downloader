@@ -1,13 +1,9 @@
 #!/usr/bin/python3
 
-from config import client
+from fuse import FUSE
 
-def process(track):
-    artist = track.artists[0].name
-    album = track.albums[0].title
-    title = track.title
-
-    print("%s - %s - %s" % (artist, album, title))
+from config import client, artists_of_interest
+from mpd_fs import MpdFilesystem
 
 def artist_exists(id):
     try:
@@ -29,15 +25,17 @@ def artist_exists(id):
         return artist, tracks
     except BaseException as e:
         print(e)
-        return False, []
+        return None, []
+
+def all_tracks():
+    for id in artists_of_interest():
+        artist, tracks = artist_exists(id)
+
+        if artist:
+            yield from tracks
 
 def main():
-    for id in range(1, 10):
-        artist, tracks = artist_exists(id)
-        if artist:
-            for track in tracks:
-                process(track)
-            print()
+    FUSE(MpdFilesystem(all_tracks()), "Music/", nothreads=True, foreground=True)
 
 if __name__ == "__main__":
     main()
