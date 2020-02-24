@@ -5,6 +5,8 @@ from fuse import FUSE
 from config import client, artists_of_interest
 from mpd_fs import MpdFilesystem
 
+import util
+
 def artist_exists(id):
     try:
         artist = client.artists_tracks(id)
@@ -23,7 +25,7 @@ def artist_exists(id):
         tracks += client.artists_tracks(id, page, total).tracks
 
         return artist, tracks
-    except BaseException as e:
+    except Exception as e:
         print(e)
         return None, []
 
@@ -35,7 +37,10 @@ def all_tracks():
             yield from tracks
 
 def main():
-    FUSE(MpdFilesystem(all_tracks()), "Music/", nothreads=True, foreground=True)
+    FUSE(MpdFilesystem(all_tracks()),
+         util.ensure_dir_exists("Music/"),
+         nothreads=True,
+         foreground=True)
 
 if __name__ == "__main__":
     main()

@@ -72,6 +72,7 @@ class MpdFilesystem(Operations):
     def __init__(self, tracks):
         self.tracks = tracks
         self._generate_tree()
+        print("Ready")
 
     def _generate_tree(self):
         self.tree = {}
