@@ -36,7 +36,7 @@ class Cache:
         if track:
             return self.read(track) if track.cached else self.download(track)
         else:
-            return bytearray()
+            return bytes()
 
     def read(self, track):
         with open(track.cache_entry, "rb") as file:
@@ -56,6 +56,13 @@ class Cache:
 
 cache = Cache()
 
+def contents_getter(fun):
+    def wrapper(self, offset=0, length=-1):
+        contents = fun(self)
+        end = len(contents) if length < 0 else offset + length
+        return contents[offset:end]
+    return wrapper
+
 class Track:
     def __init__(self, ym_track):
         self.ym_track = ym_track
@@ -65,8 +72,38 @@ class Track:
     def get_filename(self):
         return cache.get_track_filename(self.ym_track)
 
+    @contents_getter
     def contents(self):
         return cache.get(self)
+
+class DummyFile:
+    def __init__(self, size):
+        bitrate = 192000
+        sample_rate = 44100
+
+        header = [0xF, 0xF, 0xF, 0xB, 0xE, 0x0, 0x0, 0x4]
+
+        frame_length = int(144 * bitrate / sample_rate)
+        data_length = frame_length - len(header)
+
+        data = [0xA for i in range(data_length)]
+
+        self.frame = header + data
+        self.frames = bytes()
+
+        total = 0
+
+        while total < size:
+            self.frames += bytes(self.frame)
+            total += len(self.frame)
+
+        self.size = total
+
+    @contents_getter
+    def contents(self):
+        return self.frames
+
+dummy = DummyFile(1024 * 1024)
 
 class MpdFilesystem(Operations):
     def __init__(self, tracks):
@@ -90,11 +127,7 @@ class MpdFilesystem(Operations):
 
     def _get_track(self, path):
         parts = util.split_path(path)
-
-        if ".mpdignore" in parts:
-            return None
-        else:
-            return self.tree[parts[0]][parts[1]][os.path.splitext(parts[2])[0]]
+        return self.tree[parts[0]][parts[1]][os.path.splitext(parts[2])[0]]
 
     def _artists(self):
         for k, v in self.tree.items():
@@ -129,6 +162,9 @@ class MpdFilesystem(Operations):
         return len(util.split_path(path)) != 3
 
     def getattr(self, path, fh=None):
+        if ".mpdignore" in path:
+            return {}
+
         st = {}
 
         st["st_uid"] = os.getuid()
@@ -136,15 +172,28 @@ class MpdFilesystem(Operations):
         st["st_mode"] = S_IFDIR | 0o554 if self._is_dir(path) else S_IFREG | 0o444
         st["st_ctime"] = st["st_mtime"] = st["st_atime"] = time.time()
         st["st_nlink"] = 2 if self._is_dir(path) else 1
-        st["st_size"] = 0 if self._is_dir(path) else cache.size(self._get_track(path))
+
+        if self._is_dir(path):
+            st["st_size"] = 0
+        elif self._get_track(path).cached:
+            st["st_size"] = cache.size(self._get_track(path))
+        else:
+            st["st_size"] = dummy.size
 
         return st
 
     def read(self, path, length, offset, fh):
+        if ".mpdignore" in path:
+            return bytes()
+
         if not self._is_dir(path):
             track = self._get_track(path)
 
-            if track:
-                return track.contents()[offset : offset + length]
+            mpd_chunk_size = 131072
+            junk_limit = 65536
+
+            if not track.cached and (length != junk_limit
+                                     or length == mpd_chunk_size):
+                return dummy.contents(offset, length)
             else:
-                return bytearray()
+                return track.contents(offset, length)
