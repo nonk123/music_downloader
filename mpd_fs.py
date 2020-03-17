@@ -28,13 +28,13 @@ class Cache:
 
     def size(self, track):
         if track:
-            return len(self.get(track)) if track.cached else 0
+            return len(self.get(track)) if track.is_cached() else 0
         else:
             return 0
 
     def get(self, track):
         if track:
-            return self.read(track) if track.cached else self.download(track)
+            return self.read(track) if track.is_cached() else self.download(track)
         else:
             return bytes()
 
@@ -50,8 +50,6 @@ class Cache:
                                 codec,
                                 bitrate)
 
-        track.cached = True
-
         return self.read(track)
 
 cache = Cache()
@@ -66,8 +64,10 @@ def contents_getter(fun):
 class Track:
     def __init__(self, ym_track):
         self.ym_track = ym_track
-        self.cached = cache.is_cached(ym_track)
         self.cache_entry = cache.get_track_path(ym_track)
+
+    def is_cached(self):
+        return cache.is_cached(self.ym_track)
 
     def get_filename(self):
         return cache.get_track_filename(self.ym_track)
@@ -175,7 +175,7 @@ class MpdFilesystem(Operations):
 
         if self._is_dir(path):
             st["st_size"] = 0
-        elif self._get_track(path).cached:
+        elif self._get_track(path).is_cached():
             st["st_size"] = cache.size(self._get_track(path))
         else:
             st["st_size"] = dummy.size
@@ -192,7 +192,7 @@ class MpdFilesystem(Operations):
             mpd_chunk_size = 131072
             junk_limit = 65536
 
-            if not track.cached and (length != junk_limit
+            if not track.is_cached() and (length != junk_limit
                                      or length == mpd_chunk_size):
                 return dummy.contents(offset, length)
             else:
