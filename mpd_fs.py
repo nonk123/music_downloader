@@ -5,6 +5,7 @@ import time
 
 from stat import S_IFDIR, S_IFREG
 from fuse import Operations
+from sdnotify import SystemdNotifier
 
 import util
 
@@ -110,6 +111,7 @@ class MpdFilesystem(Operations):
         self.tracks = tracks
         self._generate_tree()
         print("Ready")
+        SystemdNotifier().notify("READY=1")
 
     def _generate_tree(self):
         self.tree = {}
