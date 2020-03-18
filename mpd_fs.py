@@ -3,11 +3,14 @@ import os.path
 
 import time
 
+from threading import Thread
+
 from stat import S_IFDIR, S_IFREG
 from fuse import Operations
 from sdnotify import SystemdNotifier
 
 import util
+from config import client
 
 class Cache:
     def __init__(self):
@@ -106,14 +109,40 @@ class DummyFile:
 
 dummy = DummyFile(1024 * 1024)
 
+class TracksManager:
+    def __init__(self):
+        self.artists_file_name = "artists.txt"
+
+    def get_artist_ids(self):
+        with open(self.artists_file_name, "r") as f:
+            return f.readlines()
+
+    def get_tracks_for_artist_id(self, artist_id):
+        artist_id = int(artist_id)
+        total = client.artists_tracks(artist_id).pager.total
+        return client.artists_tracks(artist_id, 0, total).tracks
+
+    def get_tracks(self):
+        for id in self.get_artist_ids():
+            yield from self.get_tracks_for_artist_id(id)
+
 class MpdFilesystem(Operations):
-    def __init__(self, tracks):
-        self.tracks = tracks
+    def __init__(self):
+        self.tracks_manager = TracksManager()
         self._generate_tree()
-        print("Ready")
         SystemdNotifier().notify("READY=1")
 
+    def mainloop(self):
+        while True:
+            input()
+            self._generate_tree()
+
+    def init(self, path):
+        Thread(target=self.mainloop).start()
+
     def _generate_tree(self):
+        self.tracks = self.tracks_manager.get_tracks()
+
         self.tree = {}
 
         for track in self.tracks:
@@ -126,6 +155,8 @@ class MpdFilesystem(Operations):
                         self.tree[artist.name][album.title] = {}
 
                     self.tree[artist.name][album.title][track.title] = Track(track)
+
+        print("Tree generated")
 
     def _get_track(self, path):
         parts = util.split_path(path)
