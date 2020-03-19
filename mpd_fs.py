@@ -9,12 +9,12 @@ from stat import S_IFDIR, S_IFREG
 from fuse import Operations
 from sdnotify import SystemdNotifier
 
-import util
+from util import ensure_dir_exists, split_path
 from config import client
 
 class Cache:
     def __init__(self):
-        self.cache_dir = util.ensure_dir_exists("Cache/")
+        self.cache_dir = ensure_dir_exists("Cache/")
         self.extension = ".mp3"
 
     def get_track_path(self, ym_track):
@@ -50,7 +50,7 @@ class Cache:
         codec = self.extension[1:]
         bitrate = 192
 
-        track.ym_track.download(util.ensure_dir_exists(track.cache_entry),
+        track.ym_track.download(ensure_dir_exists(track.cache_entry),
                                 codec,
                                 bitrate)
 
@@ -159,7 +159,7 @@ class MpdFilesystem(Operations):
         print("Tree generated")
 
     def _get_track(self, path):
-        parts = util.split_path(path)
+        parts = split_path(path)
         return self.tree[parts[0]][parts[1]][os.path.splitext(parts[2])[0]]
 
     def _artists(self):
@@ -179,7 +179,7 @@ class MpdFilesystem(Operations):
             yield cache.get_track_filename(track.ym_track)
 
     def readdir(self, path, fh):
-        path = util.split_path(path)
+        path = split_path(path)
 
         yield "."
         yield ".."
@@ -192,7 +192,7 @@ class MpdFilesystem(Operations):
             yield from self._track_filenames(path[0], path[1])
 
     def _is_dir(self, path):
-        return len(util.split_path(path)) != 3
+        return len(split_path(path)) != 3
 
     def getattr(self, path, fh=None):
         if ".mpdignore" in path:
