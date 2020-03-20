@@ -3,8 +3,6 @@ import os.path
 
 import time
 
-from threading import Thread
-
 from stat import S_IFDIR, S_IFREG
 from fuse import Operations
 from sdnotify import SystemdNotifier
@@ -81,7 +79,7 @@ class Track:
         return cache.get(self)
 
 class DummyFile:
-    def __init__(self, size):
+    def __init__(self):
         bitrate = 192000
         sample_rate = 44100
 
@@ -97,17 +95,18 @@ class DummyFile:
 
         total = 0
 
-        while total < size:
+        while total < 1024:
             self.frames += bytes(self.frame)
             total += len(self.frame)
 
-        self.size = total
+        self.real_size = total
+        self.fake_size = 2048
 
     @contents_getter
     def contents(self):
         return self.frames
 
-dummy = DummyFile(1024 * 1024)
+dummy = DummyFile()
 
 class TracksManager:
     def __init__(self):
@@ -131,14 +130,6 @@ class MpdFilesystem(Operations):
         self.tracks_manager = TracksManager()
         self._generate_tree()
         SystemdNotifier().notify("READY=1")
-
-    def mainloop(self):
-        while True:
-            input()
-            self._generate_tree()
-
-    def init(self, path):
-        Thread(target=self.mainloop).start()
 
     def _generate_tree(self):
         self.tracks = self.tracks_manager.get_tracks()
@@ -211,7 +202,7 @@ class MpdFilesystem(Operations):
         elif self._get_track(path).is_cached():
             st["st_size"] = cache.size(self._get_track(path))
         else:
-            st["st_size"] = dummy.size
+            st["st_size"] = dummy.fake_size
 
         return st
 
@@ -219,14 +210,13 @@ class MpdFilesystem(Operations):
         if ".mpdignore" in path:
             return bytes()
 
+        print(path)
+        print(offset, length)
+
         if not self._is_dir(path):
             track = self._get_track(path)
 
-            mpd_chunk_size = 131072
-            junk_limit = 65536
-
-            if not track.is_cached() and (length != junk_limit
-                                     or length == mpd_chunk_size):
+            if not track.is_cached() and offset == 0 and length == 4096:
                 return dummy.contents(offset, length)
             else:
                 return track.contents(offset, length)

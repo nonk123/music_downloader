@@ -11,7 +11,9 @@ def ensure_dir_exists(path):
 def split_path(path):
     parts = os.path.split(path)
 
-    if parts[0] in ("", "/"):
+    if "" in parts:
+        return []
+    elif parts[0] in ("", "/"):
         return [parts[1]]
     elif parts[1] == "":
         return [parts[0]]
