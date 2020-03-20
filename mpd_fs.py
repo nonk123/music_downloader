@@ -210,9 +210,6 @@ class MpdFilesystem(Operations):
         if ".mpdignore" in path:
             return bytes()
 
-        print(path)
-        print(offset, length)
-
         if not self._is_dir(path):
             track = self._get_track(path)
 
