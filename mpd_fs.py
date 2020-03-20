@@ -130,6 +130,8 @@ class MpdFilesystem(Operations):
     def __init__(self):
         self.tracks_manager = TracksManager()
         self._generate_tree()
+
+    def init(self, path):
         SystemdNotifier().notify("READY=1")
 
     def _generate_tree(self):
