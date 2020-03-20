@@ -1,11 +1,15 @@
 \#*\#
 *~
 
-*.pyc
 __pycache__
 
 Music/
 Cache/
 
+*.*
+
+!*.py
+!requirements.txt
+!README.md
+
 config.py
-artists.txt
