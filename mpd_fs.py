@@ -67,6 +67,7 @@ class Track:
     def __init__(self, ym_track):
         self.ym_track = ym_track
         self.cache_entry = cache.get_track_path(ym_track)
+        self.read_bytes = 0
 
     def is_cached(self):
         return cache.is_cached(self.ym_track)
@@ -83,7 +84,7 @@ class DummyFile:
         bitrate = 192000
         sample_rate = 44100
 
-        header = [0xF, 0xF, 0xF, 0xB, 0xE, 0x0, 0x0, 0x4]
+        header = [0xFF, 0xFA, 0xB1, 0x0]
 
         frame_length = int(144 * bitrate / sample_rate)
         data_length = frame_length - len(header)
@@ -100,7 +101,7 @@ class DummyFile:
             total += len(self.frame)
 
         self.real_size = total
-        self.fake_size = 2048
+        self.fake_size = 8192
 
     @contents_getter
     def contents(self):
@@ -213,7 +214,9 @@ class MpdFilesystem(Operations):
         if not self._is_dir(path):
             track = self._get_track(path)
 
-            if not track.is_cached() and offset == 0 and length == 4096:
+            track.read_bytes += offset + length
+
+            if not track.is_cached() and track.read_bytes <= dummy.fake_size * 6:
                 return dummy.contents(offset, length)
             else:
                 return track.contents(offset, length)
